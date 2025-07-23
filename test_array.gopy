@@ -1,0 +1,5 @@
+let my_array = [1, "hello", 3]
+print my_array[0]
+print my_array[1]
+my_array[2] = "world"
+print my_array[2]
