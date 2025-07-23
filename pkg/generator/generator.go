@@ -3,7 +3,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
-	"gopy/ast"
+	"gopy/pkg/ast"
 	"strings"
 )
 
@@ -230,11 +230,11 @@ func (g *Generator) generateExpressionWithCast(expr ast.Expression, inFunction b
 		}
 		return fmt.Sprintf("(%s%s)", expr.Operator, right), nil
 	case *ast.InfixExpression:
-		left, err := g.generateExpressionWithCast(expr.Left, inFunction)
+		left, err := g.generateExpressionWithCast(expr.Left, inFunction, false)
 		if err != nil {
 			return "", err
 		}
-		right, err := g.generateExpressionWithCast(expr.Right, inFunction)
+		right, err := g.generateExpressionWithCast(expr.Right, inFunction, false)
 		if err != nil {
 			return "", err
 		}
@@ -250,6 +250,7 @@ func (g *Generator) generateExpressionWithCast(expr ast.Expression, inFunction b
 			return fmt.Sprintf("(%s || %s)", left, right), nil
 		default:
 			return fmt.Sprintf("(%s %s %s)", left, expr.Operator, right), nil
+		}
 	case *ast.ArrayLiteral:
 		elements := []string{}
 		for _, el := range expr.Elements {
@@ -270,7 +271,6 @@ func (g *Generator) generateExpressionWithCast(expr ast.Expression, inFunction b
 			return "", err
 		}
 		return fmt.Sprintf("%s[%s]", left, index), nil
-		}
 	case *ast.CallExpression:
 		var args []string
 		for _, arg := range expr.Arguments {
@@ -287,7 +287,7 @@ func (g *Generator) generateExpressionWithCast(expr ast.Expression, inFunction b
 		// Обычный вызов функции
 		return fmt.Sprintf("%s(%s)", expr.Function.String(), strings.Join(args, ", ")), nil
 	case *ast.IfExpression:
-		condition, err := g.generateExpressionWithCast(expr.Condition, inFunction)
+		condition, err := g.generateExpressionWithCast(expr.Condition, inFunction, false)
 		if err != nil {
 			return "", err
 		}
@@ -305,7 +305,7 @@ func (g *Generator) generateExpressionWithCast(expr ast.Expression, inFunction b
 		}
 		return code, nil
 	case *ast.DotExpression:
-		left, err := g.generateExpressionWithCast(expr.Left, inFunction)
+		left, err := g.generateExpressionWithCast(expr.Left, inFunction, false)
 		if err != nil {
 			return "", err
 		}

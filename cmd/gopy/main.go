@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"gopy/generator"
-	"gopy/lexer"
-	"gopy/parser"
+	"gopy/pkg/generator"
+	"gopy/pkg/lexer"
+	"gopy/pkg/parser"
 	"io/ioutil"
 	"os"
 	"os/exec"

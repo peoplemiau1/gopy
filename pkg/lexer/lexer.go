@@ -1,7 +1,7 @@
 package lexer
 
 import (
-	"gopy/token"
+	"gopy/pkg/token"
 )
 
 // Lexer преобразует исходный код в токены
