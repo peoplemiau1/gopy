@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"gopy/generator"
-	"gopy/lexer"
-	"gopy/parser"
+	"gopy/pkg/generator"
+	"gopy/pkg/lexer"
+	"gopy/pkg/logger"
+	"gopy/pkg/parser"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -13,6 +14,8 @@ import (
 )
 
 func main() {
+	defer logger.Close()
+
 	if len(os.Args) < 2 {
 		fmt.Println("Использование: gopy <файл.gopy>")
 		os.Exit(1)
@@ -29,10 +32,12 @@ func main() {
 	p := parser.New(l)
 	program := p.ParseProgram()
 
-	if len(p.Errors()) != 0 {
+	errors := p.Errors()
+	if len(errors) != 0 {
 		fmt.Println("Ошибки парсинга:")
-		for _, msg := range p.Errors() {
+		for _, msg := range errors {
 			fmt.Println("\t" + msg)
+			logger.Log("Parser Error: " + msg)
 		}
 		os.Exit(1)
 	}
@@ -40,7 +45,9 @@ func main() {
 	gen := generator.New()
 	generatedCode, err := gen.Generate(program)
 	if err != nil {
-		fmt.Printf("Ошибка генерации кода: %s\n", err)
+		errorMsg := fmt.Sprintf("Generator Error: %s", err)
+		fmt.Println(errorMsg)
+		logger.Log(errorMsg)
 		os.Exit(1)
 	}
 

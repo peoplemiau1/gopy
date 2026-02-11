@@ -1,9 +1,10 @@
 package parser
 
 import (
-	"gopy/ast"
-	"gopy/lexer"
-	"gopy/token"
+	"fmt"
+	"gopy/pkg/ast"
+	"gopy/pkg/lexer"
+	"gopy/pkg/token"
 	"strconv"
 )
 
@@ -123,14 +124,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 		stmt := p.parseStatement()
 		if stmt != nil {
-			
 			program.Statements = append(program.Statements, stmt)
-		} else {
-			// If a statement couldn't be parsed, advance to the next token to avoid infinite loop
-			// This might skip valid tokens, but it's better than an infinite loop.
-			
-			p.nextToken()
-			continue
 		}
 
 		// В ParseProgram убираю строгую проверку после parseStatement, чтобы после класса можно было сразу разбирать следующую инструкцию.
@@ -147,7 +141,15 @@ func (p *Parser) ParseProgram() *ast.Program {
 }
 
 func (p *Parser) parseStatement() ast.Statement {
-	
+	defer func() {
+		if r := recover(); r != nil {
+			// Пока не нашли токен, с которого можно начать новое выражение, пропускаем токены
+			for !p.curTokenIs(token.LET) && !p.curTokenIs(token.RETURN) && !p.curTokenIs(token.CLASS) && !p.curTokenIs(token.FOR) && !p.curTokenIs(token.EOF) {
+				p.nextToken()
+			}
+		}
+	}()
+
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
@@ -158,25 +160,7 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.FOR:
 		return p.parseForStatement()
 	default:
-		left := p.parseExpression(LOWEST)
-		// Если после выражения идёт =, это присваивание (в том числе для DotExpression)
-		if p.curTokenIs(token.ASSIGN) || p.peekTokenIs(token.ASSIGN) {
-			if p.curTokenIs(token.ASSIGN) {
-				p.nextToken() // =
-			}
-			if p.peekTokenIs(token.ASSIGN) {
-				p.nextToken() // =
-			}
-			p.nextToken() // value
-			value := p.parseExpression(LOWEST)
-			return &ast.AssignmentStatement{
-				Token: p.curToken,
-				Name: left,
-				Value: value,
-			}
-		}
-		es := &ast.ExpressionStatement{Token: p.curToken, Expression: left}
-		return es
+		return p.parseExpressionStatement()
 	}
 }
 
@@ -212,19 +196,16 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 
 
-func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
-	stmt := &ast.ExpressionStatement{Token: p.curToken}
-	stmt.Expression = p.parseExpression(LOWEST)
-	// Продвигаемся по точкам и другим инфиксным операторам до конца строки
-	for !(p.peekTokenIs(token.NEWLINE) || p.peekTokenIs(token.EOF) || p.peekTokenIs(token.INDENT) || p.peekTokenIs(token.DEDENT)) {
-		infix := p.infixParseFns[p.peekToken.Type]
-		if infix == nil {
-			break
-		}
+func (p *Parser) parseExpressionStatement() ast.Statement {
+	left := p.parseExpression(LOWEST)
+	if p.peekTokenIs(token.ASSIGN) {
 		p.nextToken()
-		stmt.Expression = infix(stmt.Expression)
+		p.nextToken()
+		value := p.parseExpression(LOWEST)
+		return &ast.AssignmentStatement{Name: left, Value: value}
 	}
-	return stmt
+
+	return &ast.ExpressionStatement{Token: p.curToken, Expression: left}
 }
 
 func (p *Parser) parseExpression(precedence int) ast.Expression {
@@ -404,6 +385,30 @@ func (p *Parser) parseCallArguments() []ast.Expression {
 	return args
 }
 
+func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
+	list := []ast.Expression{}
+
+	if p.peekTokenIs(end) {
+		p.nextToken()
+		return list
+	}
+
+	p.nextToken()
+	list = append(list, p.parseExpression(LOWEST))
+
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+		list = append(list, p.parseExpression(LOWEST))
+	}
+
+	if !p.expectPeek(end) {
+		return nil
+	}
+
+	return list
+}
+
 func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	exp := &ast.IndexExpression{Token: p.curToken, Left: left}
 	p.nextToken()
@@ -576,7 +581,9 @@ func (p *Parser) parseMethodStatement() *ast.MethodStatement {
 		return nil
 	}
 	ms.Body = p.parseBlockStatement()
-	
+	return ms
+}
+
 func (p *Parser) parseDotExpression(left ast.Expression) ast.Expression {
 	// curToken: .
 	if !p.expectPeek(token.IDENT) {

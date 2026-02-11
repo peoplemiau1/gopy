@@ -2,7 +2,7 @@ package ast
 
 import (
 	"bytes"
-	"gopy/token"
+	"gopy/pkg/token"
 	"strings"
 )
 
